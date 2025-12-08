@@ -1,0 +1,51 @@
+# backend/app/core/config.py
+from pydantic_settings import BaseSettings
+from typing import List
+
+class Settings(BaseSettings):
+    # App
+    APP_NAME: str = "SmartDoc Query System"
+    ENVIRONMENT: str = "development"
+    DEBUG: bool = True
+    
+    # Database
+    DATABASE_URL: str
+    
+    # Redis
+    REDIS_URL: str = "redis://localhost:6379/0"
+    
+    # OpenAI
+    OPENAI_API_KEY: str
+    EMBEDDING_MODEL: str = "text-embedding-3-small"
+    LLM_MODEL: str = "gpt-4-turbo-preview"
+    EMBEDDING_DIMENSION: int = 1536
+    
+    # CORS
+    CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:3000"]
+    
+    # File Upload
+    MAX_UPLOAD_SIZE_MB: int = 10
+    ALLOWED_FILE_TYPES: List[str] = ["application/pdf"]
+    UPLOAD_DIR: str = "./uploads"
+    
+    # Chunking
+    CHUNK_SIZE: int = 500  # tokens
+    CHUNK_OVERLAP: int = 50  # tokens
+    
+    # RAG
+    TOP_K_CHUNKS: int = 5
+    SIMILARITY_THRESHOLD: float = 0.7
+    
+    # Caching
+    QUERY_CACHE_TTL: int = 3600  # 1 hour
+    EMBEDDING_CACHE_TTL: int = 2592000  # 30 days
+    
+    # Rate Limiting
+    RATE_LIMIT_UPLOAD: str = "5/hour"
+    RATE_LIMIT_QUERY: str = "20/minute"
+    
+    class Config:
+        env_file = ".env"
+        case_sensitive = True
+
+settings = Settings()

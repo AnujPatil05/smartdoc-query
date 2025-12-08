@@ -1,0 +1,108 @@
+version: "3.8"
+
+services:
+  # PostgreSQL with pgvector extension
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: smartdoc_postgres
+    environment:
+      POSTGRES_USER: smartdoc
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: smartdoc_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smartdoc"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - smartdoc_network
+
+  # Redis for caching and rate limiting
+  redis:
+    image: redis:7-alpine
+    container_name: smartdoc_redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - smartdoc_network
+
+  # FastAPI Backend
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: smartdoc_api
+    environment:
+      # Database
+      DATABASE_URL: postgresql://smartdoc:admin123@postgres:5432/smartdoc_db
+
+      # Redis
+      REDIS_URL: redis://redis:6379/0
+
+      # OpenAI
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+
+      # App Config
+      ENVIRONMENT: development
+      DEBUG: "true"
+      MAX_UPLOAD_SIZE_MB: 10
+      CORS_ORIGINS: '["http://localhost:5173","http://localhost:3000"]'
+
+      # Rate Limiting
+      RATE_LIMIT_UPLOAD: 5/hour
+      RATE_LIMIT_QUERY: 20/minute
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - upload_storage:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - smartdoc_network
+
+  # React Frontend (Vite)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: smartdoc_frontend
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+    command: npm run dev -- --host 0.0.0.0
+    depends_on:
+      - api
+    networks:
+      - smartdoc_network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  upload_storage:
+    driver: local
+
+networks:
+  smartdoc_network:
+    driver: bridge
