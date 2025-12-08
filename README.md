@@ -38,22 +38,4 @@ SmartDoc Query is an end-to-end intelligent document processing system built usi
                     │ Embedding cache│   │ Semantic search   │
                     └────────────────┘   └───────────────────┘
 
-PROJECT STRUCTURE:
-smartdoc-query/
-│── backend/
-│ ├── app/
-│ │ ├── api/  
-│ │ ├── core/  
-│ │ ├── services/  
-│ │ ├── models/  
-│ │ ├── main.py  
-│ ├── Dockerfile
-│ └── requirements.txt
-│── frontend/
-│ ├── src/  
-│ ├── public/
-│ ├── Dockerfile
-│ ├── vite.config.js
-│── docker-compose.yml
-│── README.md
-│── .env.example
+![alt text](image-2.png)
