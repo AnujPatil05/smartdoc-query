@@ -8,18 +8,22 @@ async def init_redis() -> None:
     """Initialize the global Redis client."""
     global redis_client
 
-    # Create async Redis client from REDIS_URL env
-    redis_client = redis.from_url(
-        settings.REDIS_URL,
-        decode_responses=True,
-    )
+    try:
+        # Create async Redis client from REDIS_URL env
+        redis_client = redis.from_url(
+            settings.REDIS_URL,
+            decode_responses=True,
+        )
 
-    # Simple connectivity check
-    await redis_client.ping()
-    print("✅ Redis connected (from init_redis)")
+        # Simple connectivity check
+        await redis_client.ping()
+        print("✅ Redis connected")
+    except Exception as e:
+        print(f"⚠️ Redis connection failed (caching disabled): {e}")
+        redis_client = None
 
 async def get_redis():
-    """Dependency for Redis client"""
+    """Dependency for Redis client - returns None if not connected"""
     return redis_client
 
 
