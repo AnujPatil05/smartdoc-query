@@ -1,6 +1,7 @@
 # backend/app/core/config.py
 from pydantic_settings import BaseSettings
-from typing import List, Optional
+from pydantic import field_validator
+from typing import List, Optional, Union
 
 class Settings(BaseSettings):
     # App
@@ -23,8 +24,20 @@ class Settings(BaseSettings):
     # Legacy OpenAI (optional, for migration)
     OPENAI_API_KEY: Optional[str] = None
     
-    # CORS
-    CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:3000"]
+    # CORS - accepts "*" or comma-separated origins or JSON array
+    CORS_ORIGINS: Union[str, List[str]] = ["http://localhost:5173", "http://localhost:3000"]
+    
+    @field_validator('CORS_ORIGINS', mode='before')
+    @classmethod
+    def parse_cors_origins(cls, v):
+        if isinstance(v, str):
+            if v == "*":
+                return ["*"]
+            if v.startswith("["):
+                import json
+                return json.loads(v)
+            return [origin.strip() for origin in v.split(",")]
+        return v
     
     # File Upload
     MAX_UPLOAD_SIZE_MB: int = 10
