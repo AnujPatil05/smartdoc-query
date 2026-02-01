@@ -28,48 +28,79 @@ class DocumentService:
     async def process_document(file_content: bytes, filename: str, document_id: str) -> Dict:
         """Main document processing pipeline"""
         
-        # Extract text from PDF
-        pages = await DocumentService.extract_text_from_pdf(file_content)
-        
-        # Clean text
-        cleaned_pages = []
-        for page in pages:
-            cleaned_text = DocumentService.clean_text(page['text'])
-            if cleaned_text.strip():  # Skip empty pages
-                cleaned_pages.append({
-                    'page_num': page['page_num'],
-                    'text': cleaned_text
-                })
-        
-        # Chunk text
-        all_chunks = []
-        for page in cleaned_pages:
-            page_chunks = DocumentService.chunk_text(
-                text=page['text'],
-                page_num=page['page_num']
+        try:
+            print(f"📄 Starting processing for document {document_id}: {filename}")
+            
+            # Extract text from PDF
+            pages = await DocumentService.extract_text_from_pdf(file_content)
+            print(f"   Extracted {len(pages)} pages")
+            
+            # Clean text
+            cleaned_pages = []
+            for page in pages:
+                cleaned_text = DocumentService.clean_text(page['text'])
+                if cleaned_text.strip():  # Skip empty pages
+                    cleaned_pages.append({
+                        'page_num': page['page_num'],
+                        'text': cleaned_text
+                    })
+            print(f"   Cleaned {len(cleaned_pages)} pages with content")
+            
+            # Chunk text
+            all_chunks = []
+            for page in cleaned_pages:
+                page_chunks = DocumentService.chunk_text(
+                    text=page['text'],
+                    page_num=page['page_num']
+                )
+                all_chunks.extend(page_chunks)
+            print(f"   Created {len(all_chunks)} chunks")
+            
+            # Generate embeddings
+            print(f"   Generating embeddings with Gemini...")
+            embedded_chunks = await DocumentService.generate_embeddings_batch(all_chunks)
+            print(f"   Generated {len(embedded_chunks)} embeddings")
+            
+            # Store in database
+            await DocumentService.store_chunks(document_id, embedded_chunks)
+            print(f"   Stored chunks in database")
+            
+            # Update document status
+            await database.execute(
+                """
+                UPDATE documents 
+                SET processing_status = 'completed'
+                WHERE id = :document_id
+                """,
+                {"document_id": document_id}
             )
-            all_chunks.extend(page_chunks)
-        
-        # Generate embeddings
-        embedded_chunks = await DocumentService.generate_embeddings_batch(all_chunks)
-        
-        # Store in database
-        await DocumentService.store_chunks(document_id, embedded_chunks)
-        
-        # Update document status
-        await database.execute(
-            """
-            UPDATE documents 
-            SET processing_status = 'completed'
-            WHERE id = :document_id
-            """,
-            {"document_id": document_id}
-        )
-        
-        return {
-            'total_chunks': len(embedded_chunks),
-            'status': 'completed'
-        }
+            
+            print(f"✅ Document {document_id} processing completed: {len(embedded_chunks)} chunks")
+            
+            return {
+                'total_chunks': len(embedded_chunks),
+                'status': 'completed'
+            }
+            
+        except Exception as e:
+            print(f"❌ Error processing document {document_id}: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            
+            # Update document status to failed
+            try:
+                await database.execute(
+                    """
+                    UPDATE documents 
+                    SET processing_status = 'failed'
+                    WHERE id = :document_id
+                    """,
+                    {"document_id": document_id}
+                )
+            except:
+                pass
+            
+            raise
     
     @staticmethod
     async def extract_text_from_pdf(file_content: bytes) -> List[Dict]:
