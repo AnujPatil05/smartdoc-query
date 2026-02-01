@@ -1,6 +1,6 @@
 # backend/app/core/config.py
 from pydantic_settings import BaseSettings
-from typing import List
+from typing import List, Optional
 
 class Settings(BaseSettings):
     # App
@@ -14,11 +14,14 @@ class Settings(BaseSettings):
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
     
-    # OpenAI
-    OPENAI_API_KEY: str
-    EMBEDDING_MODEL: str = "text-embedding-3-small"
-    LLM_MODEL: str = "gpt-4-turbo-preview"
-    EMBEDDING_DIMENSION: int = 1536
+    # Google Gemini (replaces OpenAI)
+    GOOGLE_API_KEY: str
+    EMBEDDING_MODEL: str = "models/embedding-001"
+    LLM_MODEL: str = "gemini-1.5-flash"
+    EMBEDDING_DIMENSION: int = 768  # Gemini embedding dimension
+    
+    # Legacy OpenAI (optional, for migration)
+    OPENAI_API_KEY: Optional[str] = None
     
     # CORS
     CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:3000"]

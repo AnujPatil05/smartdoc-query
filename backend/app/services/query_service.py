@@ -2,15 +2,16 @@
 from typing import List, Dict, Optional
 import hashlib
 import json
-from openai import AsyncOpenAI
+import google.generativeai as genai
 
 from app.core.config import settings
 from app.core.database import database
 from app.core.redis import redis_client
 from app.services.document_service import DocumentService
 
-# Initialize OpenAI client
-client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+# Initialize Gemini
+genai.configure(api_key=settings.GOOGLE_API_KEY)
+
 
 class QueryService:
     @staticmethod
@@ -27,7 +28,7 @@ class QueryService:
         if cached_answer:
             return {**cached_answer, 'cache_hit': True}
         
-        # Generate query embedding
+        # Generate query embedding using Gemini
         query_embedding = await QueryService.generate_query_embedding(query)
         
         # Semantic search
@@ -45,7 +46,7 @@ class QueryService:
                 'cache_hit': False
             }
         
-        # Generate answer with LLM
+        # Generate answer with Gemini LLM
         answer = await QueryService.generate_answer(
             query,
             retrieved_chunks,
@@ -59,17 +60,18 @@ class QueryService:
     
     @staticmethod
     async def generate_query_embedding(query: str) -> List[float]:
-        """Generate embedding for query"""
+        """Generate embedding for query using Gemini"""
         cached = await DocumentService.get_cached_embedding(query)
         if cached:
             return cached
         
-        response = await client.embeddings.create(
+        result = genai.embed_content(
             model=settings.EMBEDDING_MODEL,
-            input=query
+            content=query,
+            task_type="RETRIEVAL_QUERY"
         )
         
-        embedding = response.data[0].embedding
+        embedding = result['embedding']
         await DocumentService.cache_embedding(query, embedding)
         
         return embedding
@@ -128,24 +130,34 @@ class QueryService:
         chunks: List[Dict],
         conversation_history: Optional[List[Dict]]
         ) -> Dict:
-        """Generate answer using GPT-4"""
+        """Generate answer using Gemini"""
         
         context = QueryService.build_context(chunks)
         system_prompt = QueryService.get_system_prompt()
         user_prompt = QueryService.build_user_prompt(query, context, conversation_history)
         
-        response = await client.chat.completions.create(
-            model=settings.LLM_MODEL,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
-            temperature=0.1,
-            max_tokens=800,
-            response_format={"type": "json_object"}
+        # Use Gemini for generation
+        model = genai.GenerativeModel(
+            model_name=settings.LLM_MODEL,
+            system_instruction=system_prompt,
+            generation_config={
+                "temperature": 0.1,
+                "max_output_tokens": 800,
+                "response_mime_type": "application/json"
+            }
         )
         
-        answer_json = json.loads(response.choices[0].message.content)
+        response = model.generate_content(user_prompt)
+        
+        try:
+            answer_json = json.loads(response.text)
+        except json.JSONDecodeError:
+            # Fallback if JSON parsing fails
+            return {
+                'answer': response.text,
+                'citations': [],
+                'has_answer': True
+            }
         
         citations = QueryService.map_citations(
             answer_json.get('citations', []),
@@ -153,7 +165,7 @@ class QueryService:
         )
         
         return {
-            'answer': answer_json['answer'],
+            'answer': answer_json.get('answer', response.text),
             'citations': citations,
             'has_answer': answer_json.get('has_answer', True)
         }

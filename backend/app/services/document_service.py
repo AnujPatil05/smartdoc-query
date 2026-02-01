@@ -4,21 +4,21 @@ import io
 import re
 import tiktoken
 from typing import List, Dict
-from openai import AsyncOpenAI
 import hashlib
 import json
+import google.generativeai as genai
 
 from app.core.config import settings
 from app.core.database import database
 from app.core.redis import get_redis
 
-# Initialize OpenAI client
-client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+# Initialize Gemini
+genai.configure(api_key=settings.GOOGLE_API_KEY)
 encoder = tiktoken.encoding_for_model("gpt-4")
+
 
 class DocumentService:
     
-    # MOVE THIS TO THE TOP - Helper methods should be defined first
     @staticmethod
     def _hash_text(text: str) -> str:
         """Create a SHA256 hash of the text for Redis caching keys"""
@@ -150,6 +150,16 @@ class DocumentService:
         return chunks
     
     @staticmethod
+    async def generate_embedding(text: str) -> List[float]:
+        """Generate embedding using Google Gemini"""
+        result = genai.embed_content(
+            model=settings.EMBEDDING_MODEL,
+            content=text,
+            task_type="RETRIEVAL_DOCUMENT"
+        )
+        return result['embedding']
+    
+    @staticmethod
     async def generate_embeddings_batch(chunks: List[Dict], batch_size: int = 20) -> List[Dict]:
         """Generate embeddings with caching"""
         results = []
@@ -168,22 +178,16 @@ class DocumentService:
                     embeddings.append(None)
             
             # Generate uncached embeddings
-            uncached_indices = [i for i, emb in enumerate(embeddings) if emb is None]
+            uncached_indices = [j for j, emb in enumerate(embeddings) if emb is None]
             
             if uncached_indices:
-                uncached_texts = [texts[i] for i in uncached_indices]
-                
-                response = await client.embeddings.create(
-                    model=settings.EMBEDDING_MODEL,
-                    input=uncached_texts
-                )
-                
-                for j, idx in enumerate(uncached_indices):
-                    embedding = response.data[j].embedding
+                for idx in uncached_indices:
+                    text = texts[idx]
+                    # Generate embedding using Gemini
+                    embedding = await DocumentService.generate_embedding(text)
                     embeddings[idx] = embedding
-                    
                     # Cache embedding
-                    await DocumentService.cache_embedding(texts[idx], embedding)
+                    await DocumentService.cache_embedding(text, embedding)
             
             # Add embeddings to chunks
             for j, chunk in enumerate(batch):
