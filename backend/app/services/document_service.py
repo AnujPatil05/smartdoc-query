@@ -181,14 +181,29 @@ class DocumentService:
         return chunks
     
     @staticmethod
-    async def generate_embedding(text: str) -> List[float]:
-        """Generate embedding using Google Gemini"""
-        result = genai.embed_content(
-            model=settings.EMBEDDING_MODEL,
-            content=text,
-            task_type="RETRIEVAL_DOCUMENT"
-        )
-        return result['embedding']
+    async def generate_embedding(text: str, max_retries: int = 3) -> List[float]:
+        """Generate embedding using Google Gemini with retry logic"""
+        import asyncio
+        
+        for attempt in range(max_retries):
+            try:
+                result = genai.embed_content(
+                    model=settings.EMBEDDING_MODEL,
+                    content=text,
+                    task_type="RETRIEVAL_DOCUMENT"
+                )
+                return result['embedding']
+            except Exception as e:
+                error_str = str(e)
+                if "429" in error_str or "quota" in error_str.lower() or "rate" in error_str.lower():
+                    # Rate limit - wait and retry
+                    wait_time = (2 ** attempt) * 10  # 10s, 20s, 40s
+                    print(f"   ⏳ Rate limited. Waiting {wait_time}s before retry {attempt + 1}/{max_retries}")
+                    await asyncio.sleep(wait_time)
+                else:
+                    raise
+        
+        raise Exception(f"Failed to generate embedding after {max_retries} retries")
     
     @staticmethod
     async def generate_embeddings_batch(chunks: List[Dict], batch_size: int = 20) -> List[Dict]:
@@ -212,6 +227,7 @@ class DocumentService:
             uncached_indices = [j for j, emb in enumerate(embeddings) if emb is None]
             
             if uncached_indices:
+                import asyncio
                 for idx in uncached_indices:
                     text = texts[idx]
                     # Generate embedding using Gemini
@@ -219,6 +235,8 @@ class DocumentService:
                     embeddings[idx] = embedding
                     # Cache embedding
                     await DocumentService.cache_embedding(text, embedding)
+                    # Small delay to avoid rate limits (free tier: ~100 requests/minute)
+                    await asyncio.sleep(0.7)
             
             # Add embeddings to chunks
             for j, chunk in enumerate(batch):
