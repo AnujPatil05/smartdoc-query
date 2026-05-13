@@ -20,56 +20,10 @@ Complete setup for deploying SmartDoc Query Engine to production.
 3. Once created, click on the PostgreSQL service
 4. Go to **Variables** tab and copy `DATABASE_URL`
 5. Enable pgvector extension:
-   - Go to **Data** tab → Open pgAdmin or use Railway CLI
+   - Go to **Data** tab, then open pgAdmin or use Railway CLI
    - Run: `CREATE EXTENSION IF NOT EXISTS vector;`
 
-6. Create tables (run in Railway's Query tab):
-
-```sql
-CREATE EXTENSION IF NOT EXISTS vector;
-
-CREATE TABLE documents (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    title VARCHAR(255),
-    filename VARCHAR(255),
-    page_count INTEGER DEFAULT 0,
-    processing_status VARCHAR(50) DEFAULT 'pending',
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE TABLE chunks (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    document_id UUID REFERENCES documents(id) ON DELETE CASCADE,
-    chunk_index INTEGER,
-    content TEXT,
-    page_number INTEGER,
-    char_count INTEGER,
-    token_count INTEGER,
-    embedding vector(768),
-    created_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE TABLE conversations (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id VARCHAR(255),
-    title VARCHAR(255),
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE TABLE messages (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE,
-    role VARCHAR(50),
-    content TEXT,
-    citations JSONB,
-    created_at TIMESTAMP DEFAULT NOW()
-);
-
--- Create index for vector similarity search
-CREATE INDEX ON chunks USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
-```
+6. The backend runs an idempotent schema initializer at startup. If you need to run it manually, execute `python setup_db.py` from the `backend` directory with `DATABASE_URL` configured.
 
 ---
 

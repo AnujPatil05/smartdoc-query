@@ -1,8 +1,9 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+const rawApiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+const API_BASE = rawApiBase.replace(/\/$/, '').endsWith('/api/v1')
+    ? rawApiBase.replace(/\/$/, '')
+    : `${rawApiBase.replace(/\/$/, '')}/api/v1`;
+const API_ROOT = API_BASE.replace(/\/api\/v1$/, '');
 
-/**
- * Custom error class for API errors
- */
 class ApiError extends Error {
     constructor(message, status, data = null) {
         super(message);
@@ -12,9 +13,19 @@ class ApiError extends Error {
     }
 }
 
-/**
- * Base fetch wrapper with error handling
- */
+async function parseResponse(response) {
+    if (response.status === 204) return null;
+
+    const text = await response.text();
+    if (!text) return null;
+
+    try {
+        return JSON.parse(text);
+    } catch {
+        return { detail: text };
+    }
+}
+
 async function fetchWithError(url, options = {}) {
     try {
         const response = await fetch(url, {
@@ -24,13 +35,13 @@ async function fetchWithError(url, options = {}) {
             },
         });
 
-        const data = await response.json();
+        const data = await parseResponse(response);
 
         if (!response.ok) {
             throw new ApiError(
-                data.detail || data.error || 'Request failed',
+                data?.detail || data?.error || 'Request failed',
                 response.status,
-                data
+                data,
             );
         }
 
@@ -43,47 +54,44 @@ async function fetchWithError(url, options = {}) {
     }
 }
 
-/**
- * Document API endpoints
- */
+export function normalizeDocument(doc) {
+    return {
+        id: doc.document_id,
+        title: doc.title,
+        pageCount: doc.page_count,
+        chunkCount: doc.chunk_count,
+        status: doc.status,
+        uploadTimestamp: doc.upload_timestamp,
+        message: doc.message,
+    };
+}
+
 export const documentApi = {
-    /**
-     * Upload a PDF document
-     * @param {File} file - PDF file to upload
-     * @returns {Promise<Object>} Upload result with document_id
-     */
     upload: async (file) => {
         const formData = new FormData();
         formData.append('file', file);
 
-        return fetchWithError(`${API_BASE}/upload`, {
+        const result = await fetchWithError(`${API_BASE}/upload`, {
             method: 'POST',
             body: formData,
         });
+
+        return normalizeDocument(result);
     },
 
-    /**
-     * Get list of all documents
-     * @returns {Promise<Object>} List of documents
-     */
     getAll: async () => {
-        return fetchWithError(`${API_BASE}/documents`);
+        const result = await fetchWithError(`${API_BASE}/documents`);
+        return {
+            documents: result.documents.map(normalizeDocument),
+            total: result.total,
+        };
     },
 
-    /**
-     * Get a specific document by ID
-     * @param {string} documentId 
-     * @returns {Promise<Object>} Document details
-     */
     getById: async (documentId) => {
-        return fetchWithError(`${API_BASE}/documents/${documentId}`);
+        const result = await fetchWithError(`${API_BASE}/documents/${documentId}`);
+        return normalizeDocument(result);
     },
 
-    /**
-     * Delete a document
-     * @param {string} documentId 
-     * @returns {Promise<Object>} Deletion confirmation
-     */
     delete: async (documentId) => {
         return fetchWithError(`${API_BASE}/documents/${documentId}`, {
             method: 'DELETE',
@@ -91,19 +99,7 @@ export const documentApi = {
     },
 };
 
-/**
- * Query API endpoints
- */
 export const queryApi = {
-    /**
-     * Send a query about documents
-     * @param {Object} params Query parameters
-     * @param {string} params.query - The question to ask
-     * @param {string|null} params.conversationId - Existing conversation ID
-     * @param {string[]|null} params.documentIds - Filter to specific documents
-     * @param {number} params.topK - Number of chunks to retrieve
-     * @returns {Promise<Object>} Query response with answer and citations
-     */
     ask: async ({ query, conversationId = null, documentIds = null, topK = 5 }) => {
         return fetchWithError(`${API_BASE}/query`, {
             method: 'POST',
@@ -120,34 +116,25 @@ export const queryApi = {
     },
 };
 
-/**
- * Conversation API endpoints
- */
 export const conversationApi = {
-    /**
-     * Get conversation history
-     * @param {string} conversationId 
-     * @returns {Promise<Object>} Conversation with messages
-     */
     get: async (conversationId) => {
         return fetchWithError(`${API_BASE}/conversations/${conversationId}`);
     },
 
-    /**
-     * Get all conversations
-     * @returns {Promise<Object>} List of conversations
-     */
     getAll: async () => {
         return fetchWithError(`${API_BASE}/conversations`);
     },
+
+    delete: async (conversationId) => {
+        return fetchWithError(`${API_BASE}/conversations/${conversationId}`, {
+            method: 'DELETE',
+        });
+    },
 };
 
-/**
- * Health check
- */
 export const healthApi = {
     check: async () => {
-        return fetchWithError(`${API_BASE.replace('/api/v1', '')}/health`);
+        return fetchWithError(`${API_ROOT}/health`);
     },
 };
 

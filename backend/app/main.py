@@ -1,10 +1,8 @@
 # app/main.py
-from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import uvicorn
-from typing import Optional, List
 import time
 
 from app.core.config import settings
@@ -21,15 +19,15 @@ async def lifespan(app: FastAPI):
     await init_db()
     await redis_core.init_redis()
     await database.connect()
-    print("✅ Database connected")
-    print("✅ Redis connected")
+    print("Database connected")
+    print("Redis initialized")
     
     yield
     
     # Shutdown
     await database.disconnect()
     await redis_core.close_redis()
-    print("👋 Shutting down...")
+    print("Shutting down...")
 
 
 app = FastAPI(
@@ -49,7 +47,7 @@ app.add_middleware(
 )
 
 # Rate Limiting Middleware
-#app.add_middleware(RateLimitMiddleware)
+app.add_middleware(RateLimitMiddleware)
 
 # Include routers
 app.include_router(documents.router, prefix="/api/v1", tags=["documents"])

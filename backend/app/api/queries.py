@@ -1,49 +1,55 @@
-# backend/app/api/queries.py
-from fastapi import APIRouter, HTTPException
-from typing import Optional, List
+import json
 import time
 import uuid
 
+from fastapi import APIRouter, HTTPException
+
 from app.core.database import database
-from app.services.query_service import QueryService
 from app.models.schemas import QueryRequest, QueryResponse
+from app.services.query_service import QueryService
 
 router = APIRouter()
 
+
 @router.post("/query", response_model=QueryResponse)
 async def query_documents(request: QueryRequest):
-    """Ask a question about documents"""
-    
+    """Ask a question about uploaded documents."""
     start_time = time.time()
-    
-    # Get conversation history if conversation_id provided
     conversation_history = None
-    if request.conversation_id:
+    conversation_id = str(request.conversation_id) if request.conversation_id else None
+
+    if conversation_id:
+        conversation = await database.fetch_one(
+            "SELECT id FROM conversations WHERE id = :id",
+            {"id": conversation_id},
+        )
+        if not conversation:
+            raise HTTPException(404, "Conversation not found")
+
         messages = await database.fetch_all(
             """
             SELECT role, content
             FROM messages
             WHERE conversation_id = :conv_id
-            ORDER BY created_at
+            ORDER BY created_at DESC
             LIMIT 10
             """,
-            {'conv_id': request.conversation_id}
+            {"conv_id": conversation_id},
         )
         conversation_history = [
-            {'role': msg['role'], 'content': msg['content']}
-            for msg in messages
+            {"role": msg["role"], "content": msg["content"]}
+            for msg in reversed(messages)
         ]
-    
-    # Generate answer
+
+    document_ids = [str(document_id) for document_id in request.document_ids] if request.document_ids else None
     result = await QueryService.answer_query(
         query=request.query,
-        document_ids=request.document_ids,
-        top_k=request.top_k or 5,
-        conversation_history=conversation_history
+        document_ids=document_ids,
+        top_k=request.top_k,
+        conversation_history=conversation_history,
     )
-    
-    # Create or get conversation
-    if not request.conversation_id:
+
+    if not conversation_id:
         conversation_id = str(uuid.uuid4())
         await database.execute(
             """
@@ -51,51 +57,48 @@ async def query_documents(request: QueryRequest):
             VALUES (:id, :user_id, :title)
             """,
             {
-                'id': conversation_id,
-                'user_id': request.user_id,
-                'title': request.query[:100]  # Use first 100 chars of query as title
-            }
+                "id": conversation_id,
+                "user_id": request.user_id,
+                "title": request.query[:100],
+            },
         )
     else:
-        conversation_id = request.conversation_id
-        # Update conversation timestamp
         await database.execute(
             "UPDATE conversations SET updated_at = NOW() WHERE id = :id",
-            {'id': conversation_id}
+            {"id": conversation_id},
         )
-    
-    # Store messages
+
     user_msg_id = str(uuid.uuid4())
     await database.execute(
         """
         INSERT INTO messages (id, conversation_id, role, content)
         VALUES (:id, :conv_id, 'user', :content)
         """,
-        {'id': user_msg_id, 'conv_id': conversation_id, 'content': request.query}
+        {"id": user_msg_id, "conv_id": conversation_id, "content": request.query},
     )
-    
+
     assistant_msg_id = str(uuid.uuid4())
     await database.execute(
         """
         INSERT INTO messages (id, conversation_id, role, content, citations)
-        VALUES (:id, :conv_id, 'assistant', :content, :citations)
+        VALUES (:id, :conv_id, 'assistant', :content, CAST(:citations AS jsonb))
         """,
         {
-            'id': assistant_msg_id,
-            'conv_id': conversation_id,
-            'content': result['answer'],
-            'citations': result['citations']
-        }
+            "id": assistant_msg_id,
+            "conv_id": conversation_id,
+            "content": result["answer"],
+            "citations": json.dumps(result["citations"]),
+        },
     )
-    
+
     processing_time = int((time.time() - start_time) * 1000)
-    
+
     return {
-        'conversation_id': conversation_id,
-        'message_id': assistant_msg_id,
-        'answer': result['answer'],
-        'citations': result['citations'],
-        'retrieved_chunks': len(result['citations']),
-        'cache_hit': result['cache_hit'],
-        'processing_time_ms': processing_time
+        "conversation_id": conversation_id,
+        "message_id": assistant_msg_id,
+        "answer": result["answer"],
+        "citations": result["citations"],
+        "retrieved_chunks": len(result["citations"]),
+        "cache_hit": result["cache_hit"],
+        "processing_time_ms": processing_time,
     }

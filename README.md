@@ -110,31 +110,11 @@ npm run dev
 
 ### Database Setup
 
-```sql
--- Enable pgvector extension
-CREATE EXTENSION IF NOT EXISTS vector;
+The backend initializes and upgrades the schema on startup. To run it manually:
 
--- Create tables (run via your migration tool or manually)
-CREATE TABLE documents (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    title VARCHAR(255),
-    page_count INTEGER,
-    processing_status VARCHAR(50),
-    created_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE TABLE chunks (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    document_id UUID REFERENCES documents(id),
-    chunk_index INTEGER,
-    content TEXT,
-    page_number INTEGER,
-    char_count INTEGER,
-    token_count INTEGER,
-    embedding vector(768)  -- Gemini embedding dimension
-);
-
-CREATE INDEX ON chunks USING ivfflat (embedding vector_cosine_ops);
+```bash
+cd backend
+python setup_db.py
 ```
 
 ## Environment Variables
@@ -161,8 +141,12 @@ CREATE INDEX ON chunks USING ivfflat (embedding vector_cosine_ops);
 |--------|----------|-------------|
 | POST | `/api/v1/upload` | Upload PDF document |
 | GET | `/api/v1/documents` | List all documents |
+| GET | `/api/v1/documents/{id}` | Get document status |
+| DELETE | `/api/v1/documents/{id}` | Delete a document |
 | POST | `/api/v1/query` | Ask a question |
-| GET | `/api/v1/conversations/:id` | Get conversation history |
+| GET | `/api/v1/conversations` | List conversations |
+| GET | `/api/v1/conversations/{id}` | Get conversation history |
+| DELETE | `/api/v1/conversations/{id}` | Delete a conversation |
 
 ## License
 

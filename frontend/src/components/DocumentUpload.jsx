@@ -1,5 +1,5 @@
 import { Upload, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
-import { useDocuments } from '../context/DocumentContext';
+import { useDocuments } from '../hooks/useDocuments';
 import { useDocumentUpload } from '../hooks/useDocumentUpload';
 
 export default function DocumentUpload() {
@@ -16,8 +16,11 @@ export default function DocumentUpload() {
     };
 
     return (
-        <div className="bg-white rounded-xl shadow-md p-8">
-            <h2 className="text-xl font-semibold text-slate-900 mb-4">Upload Documents</h2>
+        <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-5">
+                <h2 className="text-lg font-semibold text-slate-950">Upload PDF</h2>
+                <p className="mt-1 text-sm text-slate-500">Files are chunked, embedded, and indexed for semantic search.</p>
+            </div>
             <label className="block cursor-pointer">
                 <input
                     type="file"
@@ -25,24 +28,24 @@ export default function DocumentUpload() {
                     onChange={handleFileChange}
                     className="hidden"
                 />
-                <div className="border-2 border-dashed border-slate-300 rounded-lg p-12 text-center hover:border-blue-400 hover:bg-blue-50 transition-all">
-                    <Upload className="w-12 h-12 mx-auto text-slate-400 mb-4" />
-                    <p className="text-lg font-medium text-slate-700">Click to upload PDF</p>
-                    <p className="text-sm text-slate-500 mt-2">Maximum file size: 10MB</p>
+                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center transition hover:border-slate-500 hover:bg-white">
+                    <Upload className="mx-auto mb-4 h-10 w-10 text-slate-400" />
+                    <p className="font-medium text-slate-800">Click to upload a PDF</p>
+                    <p className="mt-2 text-sm text-slate-500">Maximum file size: 10MB</p>
                 </div>
             </label>
 
             {uploadProgress && (
-                <div className="mt-4 p-4 bg-slate-50 rounded-lg flex items-center justify-between">
+                <div className="mt-4 flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 p-4">
                     <div className="flex items-center space-x-3">
                         {uploadProgress.status === 'uploading' && (
-                            <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
+                            <Loader2 className="h-5 w-5 animate-spin text-slate-600" />
                         )}
-                        {uploadProgress.status === 'completed' && (
-                            <CheckCircle className="w-5 h-5 text-green-500" />
-                        )}
+                        {uploadProgress.status === 'completed' || uploadProgress.status === 'processing' ? (
+                            <CheckCircle className="h-5 w-5 text-emerald-600" />
+                        ) : null}
                         {uploadProgress.status === 'failed' && (
-                            <AlertCircle className="w-5 h-5 text-red-500" />
+                            <AlertCircle className="h-5 w-5 text-rose-600" />
                         )}
                         <span className="text-sm font-medium text-slate-700">{uploadProgress.name}</span>
                     </div>
@@ -52,6 +55,6 @@ export default function DocumentUpload() {
                     </span>
                 </div>
             )}
-        </div>
+        </section>
     );
 }

@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { queryApi, ApiError } from '../services/api';
-import { useDocuments } from '../context/DocumentContext';
+import { useDocuments } from './useDocuments';
 
 /**
  * Custom hook for handling document queries

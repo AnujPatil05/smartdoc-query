@@ -1,6 +1,7 @@
 # backend/app/models/schemas.py
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
+from uuid import UUID
 
 class DocumentResponse(BaseModel):
     document_id: str
@@ -9,6 +10,7 @@ class DocumentResponse(BaseModel):
     chunk_count: int
     status: str
     message: Optional[str] = None
+    upload_timestamp: Optional[str] = None
 
 class DocumentListResponse(BaseModel):
     documents: List[dict]
@@ -23,10 +25,30 @@ class Citation(BaseModel):
 
 class QueryRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=1000)
-    conversation_id: Optional[str] = None
-    document_ids: Optional[List[str]] = None
-    top_k: Optional[int] = 5
+    conversation_id: Optional[UUID] = None
+    document_ids: Optional[List[UUID]] = None
+    top_k: int = Field(default=5, ge=1, le=10)
     user_id: Optional[str] = None
+
+    @field_validator("query")
+    @classmethod
+    def strip_query(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("Query cannot be empty")
+        return stripped
+
+
+class ConversationSummary(BaseModel):
+    id: str
+    title: Optional[str] = None
+    created_at: str
+    updated_at: str
+
+
+class ConversationListResponse(BaseModel):
+    conversations: List[ConversationSummary]
+    total: int
 
 class QueryResponse(BaseModel):
     conversation_id: str

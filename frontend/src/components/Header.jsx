@@ -1,42 +1,49 @@
-import { FileText, Upload, MessageSquare } from 'lucide-react';
+import { FileText, MessageSquare, Upload } from 'lucide-react';
+import { useDocuments } from '../hooks/useDocuments';
 
 export default function Header({ activeView, setActiveView }) {
+    const { documents } = useDocuments();
+    const readyCount = documents.filter(doc => doc.status === 'completed').length;
+
     return (
-        <header className="bg-white border-b border-slate-200 shadow-sm">
-            <div className="max-w-7xl mx-auto px-6 py-4">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
-                            <FileText className="w-6 h-6 text-white" />
-                        </div>
-                        <div>
-                            <h1 className="text-2xl font-bold text-slate-900">SmartDoc Query</h1>
-                            <p className="text-sm text-slate-500">AI-Powered Document Intelligence</p>
-                        </div>
+        <header className="border-b border-slate-200 bg-white">
+            <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4">
+                <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-slate-950 text-white">
+                        <FileText className="h-5 w-5" />
                     </div>
-                    <div className="flex space-x-2">
-                        <button
-                            onClick={() => setActiveView('upload')}
-                            className={`px-4 py-2 rounded-lg font-medium transition-all ${activeView === 'upload'
-                                    ? 'bg-blue-500 text-white shadow-md'
-                                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                                }`}
-                        >
-                            <Upload className="w-4 h-4 inline mr-2" />
-                            Upload
-                        </button>
-                        <button
-                            onClick={() => setActiveView('chat')}
-                            className={`px-4 py-2 rounded-lg font-medium transition-all ${activeView === 'chat'
-                                    ? 'bg-blue-500 text-white shadow-md'
-                                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                                }`}
-                        >
-                            <MessageSquare className="w-4 h-4 inline mr-2" />
-                            Chat
-                        </button>
+                    <div className="min-w-0">
+                        <h1 className="truncate text-xl font-bold text-slate-950">SmartDoc Query</h1>
+                        <p className="text-sm text-slate-500">{readyCount}/{documents.length} documents ready</p>
                     </div>
                 </div>
+
+                <nav className="flex rounded-md border border-slate-200 bg-slate-50 p-1">
+                    <button
+                        type="button"
+                        onClick={() => setActiveView('upload')}
+                        className={`inline-flex items-center gap-2 rounded px-3 py-2 text-sm font-medium transition ${
+                            activeView === 'upload'
+                                ? 'bg-white text-slate-950 shadow-sm'
+                                : 'text-slate-600 hover:text-slate-950'
+                        }`}
+                    >
+                        <Upload className="h-4 w-4" />
+                        Upload
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setActiveView('chat')}
+                        className={`inline-flex items-center gap-2 rounded px-3 py-2 text-sm font-medium transition ${
+                            activeView === 'chat'
+                                ? 'bg-white text-slate-950 shadow-sm'
+                                : 'text-slate-600 hover:text-slate-950'
+                        }`}
+                    >
+                        <MessageSquare className="h-4 w-4" />
+                        Chat
+                    </button>
+                </nav>
             </div>
         </header>
     );

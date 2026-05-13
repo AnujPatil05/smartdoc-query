@@ -1,11 +1,13 @@
 # backend/app/services/document_service.py
 import PyPDF2
+from PyPDF2.errors import PdfReadError
 import io
 import re
 import tiktoken
 from typing import List, Dict
 import hashlib
 import json
+import asyncio
 import google.generativeai as genai
 
 from app.core.config import settings
@@ -23,13 +25,18 @@ class DocumentService:
     def _hash_text(text: str) -> str:
         """Create a SHA256 hash of the text for Redis caching keys"""
         return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def vector_literal(values: List[float]) -> str:
+        """Format an embedding as a pgvector literal."""
+        return "[" + ",".join(str(float(value)) for value in values) + "]"
     
     @staticmethod
     async def process_document(file_content: bytes, filename: str, document_id: str) -> Dict:
         """Main document processing pipeline"""
         
         try:
-            print(f"📄 Starting processing for document {document_id}: {filename}")
+            print(f"Starting processing for document {document_id}: {filename}")
             
             # Extract text from PDF
             pages = await DocumentService.extract_text_from_pdf(file_content)
@@ -53,8 +60,12 @@ class DocumentService:
                     text=page['text'],
                     page_num=page['page_num']
                 )
-                all_chunks.extend(page_chunks)
+                for chunk in page_chunks:
+                    chunk['chunk_index'] = len(all_chunks)
+                    all_chunks.append(chunk)
             print(f"   Created {len(all_chunks)} chunks")
+            if not all_chunks:
+                raise ValueError("No extractable text was found in this PDF")
             
             # Generate embeddings
             print(f"   Generating embeddings with Gemini...")
@@ -75,7 +86,7 @@ class DocumentService:
                 {"document_id": document_id}
             )
             
-            print(f"✅ Document {document_id} processing completed: {len(embedded_chunks)} chunks")
+            print(f"Document {document_id} processing completed: {len(embedded_chunks)} chunks")
             
             return {
                 'total_chunks': len(embedded_chunks),
@@ -83,7 +94,7 @@ class DocumentService:
             }
             
         except Exception as e:
-            print(f"❌ Error processing document {document_id}: {str(e)}")
+            print(f"Error processing document {document_id}: {str(e)}")
             import traceback
             traceback.print_exc()
             
@@ -97,7 +108,7 @@ class DocumentService:
                     """,
                     {"document_id": document_id}
                 )
-            except:
+            except Exception:
                 pass
             
             raise
@@ -106,11 +117,22 @@ class DocumentService:
     async def extract_text_from_pdf(file_content: bytes) -> List[Dict]:
         """Extract text from PDF with page numbers"""
         pdf_file = io.BytesIO(file_content)
-        reader = PyPDF2.PdfReader(pdf_file)
+        try:
+            reader = PyPDF2.PdfReader(pdf_file)
+        except PdfReadError as exc:
+            raise ValueError("The uploaded file is not a readable PDF") from exc
+
+        if reader.is_encrypted:
+            try:
+                decrypt_result = reader.decrypt("")
+            except Exception as exc:
+                raise ValueError("Encrypted PDFs are not supported") from exc
+            if decrypt_result == 0:
+                raise ValueError("Encrypted PDFs are not supported")
         
         pages = []
         for page_num, page in enumerate(reader.pages, start=1):
-            text = page.extract_text()
+            text = page.extract_text() or ""
             pages.append({
                 'page_num': page_num,
                 'text': text
@@ -183,14 +205,13 @@ class DocumentService:
     @staticmethod
     async def generate_embedding(text: str, max_retries: int = 3) -> List[float]:
         """Generate embedding using Google Gemini with retry logic"""
-        import asyncio
-        
         for attempt in range(max_retries):
             try:
-                result = genai.embed_content(
+                result = await asyncio.to_thread(
+                    genai.embed_content,
                     model=settings.EMBEDDING_MODEL,
                     content=text,
-                    task_type="RETRIEVAL_DOCUMENT"
+                    task_type="RETRIEVAL_DOCUMENT",
                 )
                 return result['embedding']
             except Exception as e:
@@ -198,7 +219,7 @@ class DocumentService:
                 if "429" in error_str or "quota" in error_str.lower() or "rate" in error_str.lower():
                     # Rate limit - wait and retry
                     wait_time = (2 ** attempt) * 10  # 10s, 20s, 40s
-                    print(f"   ⏳ Rate limited. Waiting {wait_time}s before retry {attempt + 1}/{max_retries}")
+                    print(f"   Rate limited. Waiting {wait_time}s before retry {attempt + 1}/{max_retries}")
                     await asyncio.sleep(wait_time)
                 else:
                     raise
@@ -227,7 +248,6 @@ class DocumentService:
             uncached_indices = [j for j, emb in enumerate(embeddings) if emb is None]
             
             if uncached_indices:
-                import asyncio
                 for idx in uncached_indices:
                     text = texts[idx]
                     # Generate embedding using Gemini
@@ -281,7 +301,7 @@ class DocumentService:
             await database.execute(
                 """
                 INSERT INTO chunks (document_id, chunk_index, content, page_number, char_count, token_count, embedding)
-                VALUES (:document_id, :chunk_index, :content, :page_number, :char_count, :token_count, :embedding::vector)
+                VALUES (:document_id, :chunk_index, :content, :page_number, :char_count, :token_count, CAST(:embedding AS vector))
                 """,
                 {
                     'document_id': document_id,
@@ -290,6 +310,6 @@ class DocumentService:
                     'page_number': chunk['page_number'],
                     'char_count': chunk['char_count'],
                     'token_count': chunk['token_count'],
-                    'embedding': chunk['embedding']
+                    'embedding': DocumentService.vector_literal(chunk['embedding'])
                 }
             )

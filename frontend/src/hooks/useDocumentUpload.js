@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { documentApi, ApiError } from '../services/api';
-import { useDocuments } from '../context/DocumentContext';
+import { useDocuments } from './useDocuments';
 
 /**
  * Custom hook for handling document uploads
@@ -30,18 +30,12 @@ export function useDocumentUpload() {
             const result = await documentApi.upload(file);
 
             // Add to global state
-            addDocument({
-                id: result.document_id,
-                title: result.title,
-                pageCount: result.page_count,
-                chunkCount: result.chunk_count,
-                status: result.status,
-            });
+            addDocument(result);
 
-            setUploadProgress({ name: file.name, status: 'completed' });
+            setUploadProgress({ name: file.name, status: 'processing' });
 
             // Clear progress after 2 seconds
-            setTimeout(() => setUploadProgress(null), 2000);
+            setTimeout(() => setUploadProgress(null), 2500);
 
             return result;
         } catch (err) {

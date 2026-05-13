@@ -8,30 +8,27 @@ import ChatSidebar from './components/ChatSidebar';
 import ChatMessages from './components/ChatMessages';
 import ChatInput from './components/ChatInput';
 
-// Main app content that uses context
 function AppContent() {
   const [activeView, setActiveView] = useState('upload');
   const { sendQuery, isQuerying } = useDocumentQuery();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="min-h-screen bg-slate-100 text-slate-950">
       <Header activeView={activeView} setActiveView={setActiveView} />
 
-      <main className="max-w-7xl mx-auto px-6 py-8">
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         {activeView === 'upload' ? (
-          // Upload View
-          <div className="space-y-6">
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
             <DocumentUpload />
             <DocumentList />
           </div>
         ) : (
-          // Chat View
-          <div className="grid grid-cols-4 gap-6 h-[calc(100vh-12rem)]">
+          <div className="grid min-h-[calc(100vh-8.5rem)] gap-5 lg:grid-cols-[18rem_minmax(0,1fr)]">
             <ChatSidebar />
-            <div className="col-span-3 bg-white rounded-xl shadow-md flex flex-col">
+            <section className="flex min-h-[34rem] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
               <ChatMessages isLoading={isQuerying} />
               <ChatInput onSendQuery={sendQuery} isLoading={isQuerying} />
-            </div>
+            </section>
           </div>
         )}
       </main>
@@ -39,7 +36,6 @@ function AppContent() {
   );
 }
 
-// Root app with provider wrapper
 export default function App() {
   return (
     <DocumentProvider>

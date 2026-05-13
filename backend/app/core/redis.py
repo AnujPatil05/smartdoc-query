@@ -17,9 +17,9 @@ async def init_redis() -> None:
 
         # Simple connectivity check
         await redis_client.ping()
-        print("✅ Redis connected")
+        print("Redis connected")
     except Exception as e:
-        print(f"⚠️ Redis connection failed (caching disabled): {e}")
+        print(f"Redis connection failed (caching disabled): {e}")
         redis_client = None
 
 async def get_redis():
@@ -34,4 +34,4 @@ async def close_redis() -> None:
     if redis_client is not None:
         await redis_client.close()
         redis_client = None
-        print("👋 Redis connection closed")
+        print("Redis connection closed")

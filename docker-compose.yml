@@ -7,7 +7,7 @@ services:
     container_name: smartdoc_postgres
     environment:
       POSTGRES_USER: smartdoc
-      POSTGRES_PASSWORD: admin123
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-smartdoc_password}
       POSTGRES_DB: smartdoc_db
     ports:
       - "5433:5432"
@@ -46,13 +46,13 @@ services:
     container_name: smartdoc_api
     environment:
       # Database
-      DATABASE_URL: postgresql://smartdoc:admin123@postgres:5432/smartdoc_db
+      DATABASE_URL: postgresql://smartdoc:${POSTGRES_PASSWORD:-smartdoc_password}@postgres:5432/smartdoc_db
 
       # Redis
       REDIS_URL: redis://redis:6379/0
 
-      # OpenAI
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      # Google Gemini
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
 
       # App Config
       ENVIRONMENT: development
@@ -84,7 +84,7 @@ services:
       dockerfile: Dockerfile
     container_name: smartdoc_frontend
     environment:
-      VITE_API_BASE_URL: http://localhost:8000
+      VITE_API_BASE_URL: http://localhost:8000/api/v1
     ports:
       - "5173:5173"
     volumes:

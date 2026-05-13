@@ -1,4 +1,5 @@
-import { createContext, useContext, useReducer, useCallback } from 'react';
+import { useReducer, useCallback } from 'react';
+import { DocumentContext } from './DocumentContextValue';
 
 // Initial state
 const initialState = {
@@ -14,6 +15,8 @@ const initialState = {
 const ACTIONS = {
   ADD_DOCUMENT: 'ADD_DOCUMENT',
   SET_DOCUMENTS: 'SET_DOCUMENTS',
+  UPDATE_DOCUMENT: 'UPDATE_DOCUMENT',
+  REMOVE_DOCUMENT: 'REMOVE_DOCUMENT',
   SET_SELECTED_DOCUMENTS: 'SET_SELECTED_DOCUMENTS',
   TOGGLE_DOCUMENT_SELECTION: 'TOGGLE_DOCUMENT_SELECTION',
   SET_CONVERSATION_ID: 'SET_CONVERSATION_ID',
@@ -28,10 +31,31 @@ const ACTIONS = {
 function documentReducer(state, action) {
   switch (action.type) {
     case ACTIONS.ADD_DOCUMENT:
-      return { ...state, documents: [...state.documents, action.payload] };
+      return {
+        ...state,
+        documents: [
+          action.payload,
+          ...state.documents.filter(doc => doc.id !== action.payload.id),
+        ],
+      };
     
     case ACTIONS.SET_DOCUMENTS:
       return { ...state, documents: action.payload };
+
+    case ACTIONS.UPDATE_DOCUMENT:
+      return {
+        ...state,
+        documents: state.documents.map(doc =>
+          doc.id === action.payload.id ? { ...doc, ...action.payload } : doc
+        ),
+      };
+
+    case ACTIONS.REMOVE_DOCUMENT:
+      return {
+        ...state,
+        documents: state.documents.filter(doc => doc.id !== action.payload),
+        selectedDocumentIds: state.selectedDocumentIds.filter(id => id !== action.payload),
+      };
     
     case ACTIONS.SET_SELECTED_DOCUMENTS:
       return { ...state, selectedDocumentIds: action.payload };
@@ -70,9 +94,6 @@ function documentReducer(state, action) {
   }
 }
 
-// Create context
-const DocumentContext = createContext(null);
-
 // Provider component
 export function DocumentProvider({ children }) {
   const [state, dispatch] = useReducer(documentReducer, initialState);
@@ -80,6 +101,18 @@ export function DocumentProvider({ children }) {
   // Action creators
   const addDocument = useCallback((doc) => {
     dispatch({ type: ACTIONS.ADD_DOCUMENT, payload: doc });
+  }, []);
+
+  const setDocuments = useCallback((docs) => {
+    dispatch({ type: ACTIONS.SET_DOCUMENTS, payload: docs });
+  }, []);
+
+  const updateDocument = useCallback((doc) => {
+    dispatch({ type: ACTIONS.UPDATE_DOCUMENT, payload: doc });
+  }, []);
+
+  const removeDocument = useCallback((id) => {
+    dispatch({ type: ACTIONS.REMOVE_DOCUMENT, payload: id });
   }, []);
 
   const setSelectedDocuments = useCallback((ids) => {
@@ -120,6 +153,9 @@ export function DocumentProvider({ children }) {
     uploadProgress: state.uploadProgress,
     // Actions
     addDocument,
+    setDocuments,
+    updateDocument,
+    removeDocument,
     setSelectedDocuments,
     toggleDocumentSelection,
     setConversationId,
@@ -135,14 +171,3 @@ export function DocumentProvider({ children }) {
     </DocumentContext.Provider>
   );
 }
-
-// Custom hook to use the context
-export function useDocuments() {
-  const context = useContext(DocumentContext);
-  if (!context) {
-    throw new Error('useDocuments must be used within a DocumentProvider');
-  }
-  return context;
-}
-
-export { ACTIONS };
