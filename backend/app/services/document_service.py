@@ -212,6 +212,7 @@ class DocumentService:
                     model=settings.EMBEDDING_MODEL,
                     content=text,
                     task_type="RETRIEVAL_DOCUMENT",
+                    output_dimensionality=768,
                 )
                 return result['embedding']
             except Exception as e:
@@ -273,7 +274,8 @@ class DocumentService:
         if redis_client is None:
             return None
 
-        cache_key = f"embedding:{DocumentService._hash_text(text)}"
+        model_name = settings.EMBEDDING_MODEL.replace("/", "-")
+        cache_key = f"embedding:v2:{model_name}:768:{DocumentService._hash_text(text)}"
         cached = await redis_client.get(cache_key)
         if cached is None:
             return None
@@ -287,7 +289,8 @@ class DocumentService:
         if redis_client is None:
             return
 
-        cache_key = f"embedding:{DocumentService._hash_text(text)}"
+        model_name = settings.EMBEDDING_MODEL.replace("/", "-")
+        cache_key = f"embedding:v2:{model_name}:768:{DocumentService._hash_text(text)}"
         await redis_client.setex(
             cache_key,
             settings.EMBEDDING_CACHE_TTL,
