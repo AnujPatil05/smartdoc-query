@@ -11,8 +11,8 @@ sqlalchemy==1.4.49
 # Redis
 redis==5.0.1
 
-# AI/ML - Google Gemini
-google-generativeai>=0.8.0
+# AI/ML - Google Gemini (new SDK)
+google-genai>=0.8.0
 tiktoken==0.5.2
 
 # PDF Processing

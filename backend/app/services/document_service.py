@@ -8,14 +8,15 @@ from typing import List, Dict
 import hashlib
 import json
 import asyncio
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 from app.core.config import settings
 from app.core.database import database
 from app.core.redis import get_redis
 
-# Initialize Gemini
-genai.configure(api_key=settings.GOOGLE_API_KEY)
+# Initialize Gemini client
+_genai_client = genai.Client(api_key=settings.GOOGLE_API_KEY)
 encoder = tiktoken.encoding_for_model("gpt-4")
 
 
@@ -208,13 +209,15 @@ class DocumentService:
         for attempt in range(max_retries):
             try:
                 result = await asyncio.to_thread(
-                    genai.embed_content,
+                    _genai_client.models.embed_content,
                     model=settings.EMBEDDING_MODEL,
-                    content=text,
-                    task_type="RETRIEVAL_DOCUMENT",
-                    output_dimensionality=768,
+                    contents=text,
+                    config=types.EmbedContentConfig(
+                        task_type="RETRIEVAL_DOCUMENT",
+                        output_dimensionality=settings.EMBEDDING_DIMENSION,
+                    ),
                 )
-                return result['embedding']
+                return list(result.embeddings[0].values)
             except Exception as e:
                 error_str = str(e)
                 if "429" in error_str or "quota" in error_str.lower() or "rate" in error_str.lower():

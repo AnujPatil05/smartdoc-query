@@ -4,14 +4,13 @@ import json
 import re
 from typing import Dict, List, Optional
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 from app.core.config import settings
 from app.core.database import database
 from app.core.redis import get_redis
-from app.services.document_service import DocumentService
-
-genai.configure(api_key=settings.GOOGLE_API_KEY)
+from app.services.document_service import DocumentService, _genai_client
 
 
 class QueryService:
@@ -68,13 +67,16 @@ class QueryService:
             return cached
 
         result = await asyncio.to_thread(
-            genai.embed_content,
+            _genai_client.models.embed_content,
             model=settings.EMBEDDING_MODEL,
-            content=query,
-            task_type="RETRIEVAL_QUERY",
+            contents=query,
+            config=types.EmbedContentConfig(
+                task_type="RETRIEVAL_QUERY",
+                output_dimensionality=settings.EMBEDDING_DIMENSION,
+            ),
         )
 
-        embedding = result["embedding"]
+        embedding = list(result.embeddings[0].values)
         await DocumentService.cache_embedding(query, embedding)
         return embedding
 
@@ -144,19 +146,16 @@ class QueryService:
     ) -> Dict:
         """Generate a grounded answer using Gemini."""
         context = QueryService.build_context(chunks)
-        model = genai.GenerativeModel(
-            model_name=settings.LLM_MODEL,
-            system_instruction=QueryService.get_system_prompt(),
-            generation_config={
-                "temperature": 0.1,
-                "max_output_tokens": 800,
-                "response_mime_type": "application/json",
-            },
-        )
-
         response = await asyncio.to_thread(
-            model.generate_content,
-            QueryService.build_user_prompt(query, context, conversation_history),
+            _genai_client.models.generate_content,
+            model=settings.LLM_MODEL,
+            contents=QueryService.build_user_prompt(query, context, conversation_history),
+            config=types.GenerateContentConfig(
+                system_instruction=QueryService.get_system_prompt(),
+                temperature=0.1,
+                max_output_tokens=800,
+                response_mime_type="application/json",
+            ),
         )
         response_text = getattr(response, "text", "") or ""
 
