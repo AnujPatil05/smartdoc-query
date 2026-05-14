@@ -15,8 +15,11 @@ from app.core.config import settings
 from app.core.database import database
 from app.core.redis import get_redis
 
-# Initialize Gemini client
-_genai_client = genai.Client(api_key=settings.GOOGLE_API_KEY)
+# Initialize Gemini client (force v1 API — text-embedding-004 is not on v1beta)
+_genai_client = genai.Client(
+    api_key=settings.GOOGLE_API_KEY,
+    http_options={"api_version": "v1"},
+)
 encoder = tiktoken.encoding_for_model("gpt-4")
 
 
