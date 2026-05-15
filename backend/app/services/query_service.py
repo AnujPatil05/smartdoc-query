@@ -74,9 +74,10 @@ class QueryService:
             return cached
 
         payload = {
-            "model": "models/text-embedding-004",
+            "model": "models/gemini-embedding-001",
             "content": {"parts": [{"text": query}]},
             "taskType": "RETRIEVAL_QUERY",
+            "outputDimensionality": 768, 
         }
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
