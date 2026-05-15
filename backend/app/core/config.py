@@ -17,7 +17,8 @@ class Settings(BaseSettings):
     
     # Google Gemini (replaces OpenAI)
     GOOGLE_API_KEY: str
-    EMBEDDING_MODEL: str = "text-embedding-004"
+    EMBEDDING_MODEL: str = "gemini-embedding-001"
+
     LLM_MODEL: str = "gemini-1.5-flash"
     EMBEDDING_DIMENSION: int = 768  # text-embedding-004 supports output_dimensionality
     
@@ -50,7 +51,7 @@ class Settings(BaseSettings):
     
     # RAG
     TOP_K_CHUNKS: int = 5
-    SIMILARITY_THRESHOLD: float = 0.7
+    SIMILARITY_THRESHOLD: float = 0.3
     
     # Caching
     QUERY_CACHE_TTL: int = 3600  # 1 hour
