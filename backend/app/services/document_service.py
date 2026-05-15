@@ -15,7 +15,7 @@ from app.core.database import database
 from app.core.redis import get_redis
 
 # Gemini REST API endpoint (v1beta supports text-embedding-004)
-_EMBED_URL = "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent"
+_EMBED_URL = "https://generativelanguage.googleapis.com/v1/models/text-embedding-004:embedContent"
 encoder = tiktoken.encoding_for_model("gpt-4")
 
 
