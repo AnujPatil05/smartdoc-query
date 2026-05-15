@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     GOOGLE_API_KEY: str
     EMBEDDING_MODEL: str = "gemini-embedding-001"
 
-    LLM_MODEL: str = "gemini-1.5-flash"
+    LLM_MODEL: str = "gemini-2.0-flash"
     EMBEDDING_DIMENSION: int = 768  # text-embedding-004 supports output_dimensionality
     
     # Legacy OpenAI (optional, for migration)
